@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <title>Mic Keyword Response</title>
+  <style>
+    body {
+      background: black;
+      color: white;
+      font-family: sans-serif;
+      text-align: center;
+      margin: 0;
+      padding: 20px;
+    }
+    button {
+      font-size: 18px;
+      margin: 10px;
+      padding: 10px 20px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+<h1>🎤 Mic Keyword Response</h1>
+<button onclick="startProcess()">🎧 Démarrer</button>
+<div id="status">Prêt.</div>
+
+<script>
+  const keywordMap = {
+    "ok": "a5.mp3",
+    "oui": "a4.mp3"
+  };
+
+  let mediaRecorder;
+  let recordedChunks = [];
+  let recognition;
+  let recordedBlob;
+
+  function startProcess() {
+    recordedChunks = [];
+    navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
+      mediaRecorder = new MediaRecorder(stream);
+      mediaRecorder.ondataavailable = e => recordedChunks.push(e.data);
+      mediaRecorder.onstop = () => {
+        recordedBlob = new Blob(recordedChunks, { type: 'audio/webm' });
+        playAudioSequence();
+      };
+      mediaRecorder.start();
+      document.getElementById("status").textContent = "🎙️ Enregistrement 3s...";
+      setTimeout(() => mediaRecorder.stop(), 3000);
+    });
+  }
+
+  function playAudioSequence() {
+    document.getElementById("status").textContent = "▶️ Lecture : you said this.mp3";
+    const youSaid = new Audio("a5.mp3");
+    youSaid.onended = () => playUserRecording();
+    youSaid.play();
+  }
+
+  function playUserRecording() {
+    document.getElementById("status").textContent = "▶️ Lecture de votre voix...";
+    const playback = new Audio(URL.createObjectURL(recordedBlob));
+    playback.onended = () => transcribeRecording();
+    playback.play();
+  }
+
+  function transcribeRecording() {
+    document.getElementById("status").textContent = "🧠 Reconnaissance vocale...";
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      document.getElementById("status").textContent = "❌ Reconnaissance non supportée.";
+      return;
+    }
+
+    recognition = new SpeechRecognition();
+    recognition.lang = "fr-FR";
+    recognition.interimResults = false;
+    recognition.continuous = false;
+
+    recognition.onresult = e => {
+      const txt = e.results[0][0].transcript.toLowerCase();
+      document.getElementById("status").textContent = `✅ Vous avez dit : "${txt}"`;
+      for (const key in keywordMap) {
+        if (txt.includes(key)) {
+          playKeywordAudio(keywordMap[key]);
+          return;
+        }
+      }
+      document.getElementById("status").textContent += " (aucun mot-clé détecté)";
+    };
+
+    recognition.onerror = e => {
+      document.getElementById("status").textContent = "❌ Erreur : " + e.error;
+    };
+
+    recognition.start();
+  }
+
+  function playKeywordAudio(path) {
+    document.getElementById("status").textContent = "▶️ Réponse : " + path;
+    const audio = new Audio(path);
+    audio.play();
+  }
+</script>
+
+</body>
+</html>
